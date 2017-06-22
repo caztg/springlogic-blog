@@ -21,6 +21,7 @@ import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
@@ -72,10 +73,16 @@ public class ArticleController {
      * @param blogParam
      * @return
      */
+    @Transactional
     @RequestMapping(value = "/publish", method = RequestMethod.POST, consumes = "application/json")
     public ResponseEntity<Map<String,Object>> publishArticle(@RequestBody BlogParam blogParam) throws BussinessException {
 
         try {
+            ConcurrentHashMap<String,Object>map=new ConcurrentHashMap<>();
+            ConcurrentHashMap<String,Object>publicationmap=new ConcurrentHashMap<>();
+            ConcurrentHashMap<String,Object>articlemap=new ConcurrentHashMap<>();
+            map.put("publication",publicationmap);
+
             //拿出组合类里面的 article ,持久化到数据库
             Article article = blogParam.getArticle();
             articleService.save(article);// 去Article配置了 cascade = CascadeType.PERSIST 成功,如果不配置 会因为 Media是一个瞬态,保存失败.
@@ -101,14 +108,23 @@ public class ArticleController {
 
                     tag.setPublication(publication);
                     t= tagService.save(tag);
+
+                    publicationmap.put("id",t.getPublication().getId());
+                    articlemap.put("id",t.getPublication().getArticle().getId());
+                    publicationmap.put("article",articlemap);
                 }
             } else {
-
+                Publication save = publicationRepository.save(publication);
+                  /*
                 Tag tag = new Tag();
                 tag.setPublication(publication);
                 t=tagService.save(tag);
-
+                */
+                publicationmap.put("id",save.getId());
+                articlemap.put("id",save.getArticle().getId());
+                publicationmap.put("article",articlemap);
             }
+            /*
             ConcurrentHashMap<String,Object>map=new ConcurrentHashMap<>();
             ConcurrentHashMap<String,Object>publicationmap=new ConcurrentHashMap<>();
             ConcurrentHashMap<String,Object>articlemap=new ConcurrentHashMap<>();
@@ -116,7 +132,7 @@ public class ArticleController {
             publicationmap.put("id",t.getPublication().getId());
             articlemap.put("id",t.getPublication().getArticle().getId());
             publicationmap.put("article",articlemap);
-
+            */
 
 
             return ResponseEntity.ok(map);

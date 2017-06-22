@@ -7,6 +7,7 @@ import cn.springlogic.social.jpa.repository.FollowRepository;
 import cn.springlogic.social.jpa.repository.PublicationFavorRepository;
 import cn.springlogic.social.jpa.repository.PublicationRepository;
 import cn.springlogic.social.util.SortListUtils;
+import org.apache.commons.lang.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.convert.converter.Converter;
 import org.springframework.data.domain.Page;
@@ -40,7 +41,6 @@ public class BlogRestController {
     @Autowired
     private PagedResourcesAssembler pagedResourcesAssembler;
 
-
     @Autowired
     private PublicationFavorRepository publicationFavorRepository;
 
@@ -59,17 +59,19 @@ public class BlogRestController {
     @ResponseBody
     @GetMapping(value = "/search/all")
     public ResponseEntity<PagedResources<PersistentEntityResource>> publicationSearchByTopic(@RequestParam(name = "topic", required = false) String topic,
-                                                                                          @RequestParam(name = "user_id",required = false) Integer userId,
-                                                                                          Pageable pageable,
-                                                                                          PersistentEntityResourceAssembler resourceAssembler) {
+                                                                                             @RequestParam(name = "user_id", required = false) Integer userId,
+                                                                                             Pageable pageable,
+                                                                                             PersistentEntityResourceAssembler resourceAssembler) {
         //查询出所有的饭圈列表
-        Page<Publication> page = publicationRepository.findByAll(topic, pageable);
+        Page<Publication> page = null;
+        page = publicationRepository.findByAllNoTopic(pageable);
+        if (StringUtils.isNotBlank(topic)) {
+            page = publicationRepository.findByAll(topic, pageable);
+        }
+
 
         //通过工具类转化器组装
         Page<Publication> publicationPage = page.map(new PublicationsConverter(publicationFavorRepository, followRepository, userId));
-
-
-
 
 
         return ResponseEntity.ok(pagedResourcesAssembler.toResource(publicationPage, resourceAssembler));
@@ -79,7 +81,7 @@ public class BlogRestController {
      * 关注列表饭圈
      *
      * @param topic
-     * @param userId  当前用户id
+     * @param userId            当前用户id
      * @param pageable
      * @param resourceAssembler
      * @return
@@ -87,12 +89,14 @@ public class BlogRestController {
     @ResponseBody
     @GetMapping(value = "/search/follow")
     public ResponseEntity<PagedResources<PersistentEntityResource>> publicationByFollowUser(@RequestParam(name = "topic", required = false) String topic,
-                                                                                           @RequestParam(name = "user_id",required = false) Integer userId,
-                                                                                           Pageable pageable,
-                                                                                           PersistentEntityResourceAssembler resourceAssembler) {
-
-        Page<Publication> page = publicationRepository.findByFollow(topic, userId, pageable);
-      System.out.println("2222+=="+userId);
+                                                                                            @RequestParam(name = "user_id", required = false) Integer userId,
+                                                                                            Pageable pageable,
+                                                                                            PersistentEntityResourceAssembler resourceAssembler) {
+        Page<Publication> page = null;
+        page = publicationRepository.findAllByFollow(userId, pageable);
+        if (StringUtils.isNotBlank(topic)) {
+            page = publicationRepository.findByFollow(topic, userId, pageable);
+        }
         Page<Publication> publicationPage = page.map(new PublicationsConverter(publicationFavorRepository, followRepository, userId));
 
         return ResponseEntity.ok(pagedResourcesAssembler.toResource(publicationPage, resourceAssembler));
@@ -100,9 +104,10 @@ public class BlogRestController {
 
     /**
      * 读取一个用户的所有饭圈
+     *
      * @param topic
-     * @param userId  当前用户id
-     * @param targetUserId  目标用户id
+     * @param userId            当前用户id
+     * @param targetUserId      目标用户id
      * @param pageable
      * @param resourceAssembler
      * @return
@@ -110,7 +115,7 @@ public class BlogRestController {
     @ResponseBody
     @GetMapping(value = "/search/user")
     public ResponseEntity<PagedResources<PersistentEntityResource>> customSearchBySubject3(@RequestParam(name = "topic", required = false) String topic,
-                                                                                           @RequestParam(name = "user_id",required = false) Integer userId,
+                                                                                           @RequestParam(name = "user_id", required = false) Integer userId,
                                                                                            @RequestParam(name = "target_uid") Integer targetUserId,
                                                                                            Pageable pageable,
                                                                                            PersistentEntityResourceAssembler resourceAssembler) {
@@ -124,7 +129,8 @@ public class BlogRestController {
 
     /**
      * 读取一条饭圈
-     * @param userId 当前用户id
+     *
+     * @param userId              当前用户id
      * @param targetPublicationId
      * @param resourceAssembler
      * @return
@@ -132,21 +138,18 @@ public class BlogRestController {
     @ResponseBody
     @GetMapping(value = "/search/one")
     public ResponseEntity<PersistentEntityResource> customSearchBySubject4(
-            @RequestParam(name = "user_id",required = false) Integer userId,
+            @RequestParam(name = "user_id", required = false) Integer userId,
             @RequestParam(name = "target_pid") Integer targetPublicationId,
             PersistentEntityResourceAssembler resourceAssembler) {
 
         Publication publication = publicationRepository.findOneById2(targetPublicationId);
 
 
-        Converter<Publication,Publication> converter = new PublicationsConverter(publicationFavorRepository, followRepository, userId);
-        publication=converter.convert(publication);
+        Converter<Publication, Publication> converter = new PublicationsConverter(publicationFavorRepository, followRepository, userId);
+        publication = converter.convert(publication);
 
         return ResponseEntity.ok(resourceAssembler.toResource(publication));
     }
-
-
-
 
 
     /**
@@ -176,7 +179,7 @@ public class BlogRestController {
             if (null != currentUserId) {
                 //处理点赞状态
                 PublicationFavor tempFavor = publicationFavorRepository.findByPublicationIdAndUserId(source.getId(), currentUserId);
-                if(tempFavor!=null){
+                if (tempFavor != null) {
                     source.setFavor(tempFavor);
                 }
                 //设置关注状态
@@ -193,9 +196,9 @@ public class BlogRestController {
 
     /**
      * 后台 饭圈列表
-     *可根据用户名/手机号码/活动标签/内容关键字过滤,可根据创建时间/点赞数量/评论数量排序
-     * @param topic
+     * 可根据用户名/手机号码/活动标签/内容关键字过滤,可根据创建时间/点赞数量/评论数量排序
      *
+     * @param topic
      * @param pageable
      * @param resourceAssembler
      * @return
@@ -203,22 +206,33 @@ public class BlogRestController {
     @ResponseBody
     @GetMapping(value = "/search/all/admin")
     public ResponseEntity<PagedResources<PersistentEntityResource>> adminPublicationSearchByTopic(@RequestParam(name = "topic", required = false) String topic,
-                                                                                                  @RequestParam(name="nick_name",required = false,defaultValue = "")String nickName,
-                                                                                                  @RequestParam(name = "phone",required = false,defaultValue = "")String phone,
-                                                                                                  @RequestParam(name ="content",required = false,defaultValue = "")String content,
-                                                                                                  @RequestParam(name ="time_sort",required = false)String time_sort,
-                                                                                                  @RequestParam(name="comment_sort",required = false)String comment_sort,
-                                                                                                  @RequestParam(name="favor_sort",required = false)String favor_sort,
-                                                                                             Pageable pageable,
-                                                                                             PersistentEntityResourceAssembler resourceAssembler) {
-        Page<Publication> page=null;
-        //查询出所有的饭圈列表 默认按DESC排
+                                                                                                  @RequestParam(name = "nick_name", required = false, defaultValue = "") String nickName,
+                                                                                                  @RequestParam(name = "phone", required = false, defaultValue = "") String phone,
+                                                                                                  @RequestParam(name = "content", required = false, defaultValue = "") String content,
+                                                                                                  @RequestParam(name = "time_sort", required = false) String time_sort,
+                                                                                                  @RequestParam(name = "comment_sort", required = false) String comment_sort,
+                                                                                                  @RequestParam(name = "favor_sort", required = false) String favor_sort,
+                                                                                                  Pageable pageable,
+                                                                                                  PersistentEntityResourceAssembler resourceAssembler) {
+        Page<Publication> page = null;
 
-           page = publicationRepository.findByAllAdmin(topic,nickName, phone,content,pageable);
+        if (StringUtils.isNotBlank(topic)) {
 
-        if("ASC".equalsIgnoreCase(time_sort)){
-            //page =  publicationRepository.findByAllAdminASC(topic, nickName ,pageable);
-            page = publicationRepository.findByAllAdminASC(topic,nickName, phone,content,pageable);
+            if ("ASC".equalsIgnoreCase(time_sort)) {
+                //page =  publicationRepository.findByAllAdminASC(topic, nickName ,pageable);
+                page = publicationRepository.findByAllAdminASC(topic, nickName, phone, content, pageable);
+            }else {
+                page = publicationRepository.findByAllAdmin(topic, nickName, phone, content, pageable);
+            }
+
+
+        }else {
+
+            if ("ASC".equalsIgnoreCase(time_sort)) {
+                page = publicationRepository.findNoTopicByAllAdminASC(nickName, phone, content, pageable);
+            }else {
+                page = publicationRepository.findNoTopicByAllAdmin(nickName, phone, content, pageable);
+            }
         }
 
         //通过工具类转化器组装 评论数跟点赞数
@@ -232,11 +246,11 @@ public class BlogRestController {
          */
         List<Publication> tempList = publicationPage.getContent();
         //复制一个list
-        List<Publication> t =new ArrayList<Publication>(tempList);
+        List<Publication> t = new ArrayList<Publication>(tempList);
 
 
         //评论总数排序
-        if(comment_sort!=null) {
+        if (comment_sort != null) {
             Collections.sort(t, new SortListUtils<Publication>("getPublicationCommentsTotal", SortListUtils.DESC));
 
             if ("ASC".equalsIgnoreCase(comment_sort)) {
@@ -244,16 +258,16 @@ public class BlogRestController {
             }
         }
         //点赞总数排序
-         if(favor_sort!=null) {
-             Collections.sort(t, new SortListUtils<Publication>("getPublicationFavorsTotal", SortListUtils.DESC));
+        if (favor_sort != null) {
+            Collections.sort(t, new SortListUtils<Publication>("getPublicationFavorsTotal", SortListUtils.DESC));
 
 
-             if ("ASC".equalsIgnoreCase(favor_sort)) {
-                 Collections.sort(t, new SortListUtils<Publication>("getPublicationFavorsTotal", SortListUtils.ASC));
-             }
-         }
+            if ("ASC".equalsIgnoreCase(favor_sort)) {
+                Collections.sort(t, new SortListUtils<Publication>("getPublicationFavorsTotal", SortListUtils.ASC));
+            }
+        }
 
-        Page<Publication> p=new PageImpl<Publication>(t,pageable,tempList.size());
+        Page<Publication> p = new PageImpl<Publication>(t, pageable, tempList.size());
 
         return ResponseEntity.ok(pagedResourcesAssembler.toResource(p, resourceAssembler));
     }
@@ -264,15 +278,10 @@ public class BlogRestController {
     private static final class adminPublicationsConverter implements Converter<Publication, Publication> {
 
 
-
-
-
         @Override
         public Publication convert(Publication source) {
             source.setPublicationFavorsTotal(source.getPublicationFavors().size());
             source.setPublicationCommentsTotal(source.getPublicationComments().size());
-
-
 
 
             return source;

@@ -2,7 +2,7 @@ package cn.springlogic.blog.jpa.entity.rest;
 
 import cn.springlogic.user.jpa.entity.User;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
-import com.fitcooker.app.AppDataPreFixSerializer;
+import com.fitcooker.app.serializer.AppDataPreFixSerializer;
 import org.springframework.data.rest.core.config.Projection;
 
 /**
